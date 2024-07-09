@@ -7,7 +7,6 @@ Created on Mon Jul  8 12:15:11 2024
 
 def slett_vegobjekt(id):
     """
-
     Parameters
     ----------
     id : int
