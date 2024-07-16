@@ -5,17 +5,71 @@ Created on Mon Jul  8 12:15:11 2024
 @author: andryg
 """
 
-def slett_vegobjekt(id):
-    """
-    Parameters
-    ----------
-    id : int
-        Vegobjekt id til objekt som skal slettes.
+import argparse
+import getpass
+import requests
+import datetime
 
-    Returns
-    -------
-    bool
-        Returnerer True hvis vegobjekt ble suksessfullt slettet. 
-
-    """
+def fjern_vegobjekt(id):
+    
     return True
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1', 'j', 'ja'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+        
+def hent_vegobjekt_info(vegobjektid, miljø):
+    if miljø == 'utv':
+        r = requests.get(f"https://nvdbapiles-v3.utv.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Slett enkelt vegobjekt'})
+    elif miljø == 'stm':
+        r = requests.get(f"https://nvdbapiles-v3-utv.stm.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Slett enkelt vegobjekt'})
+    elif miljø == 'test':
+        r = requests.get(f"https://nvdbapiles-v3.test.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Slett enkelt vegobjekt'})
+    else:
+        r = requests.get(f"https://nvdbapiles-v3.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Slett enkelt vegobjekt'})
+    if r.status_code == 200:
+        return r.json()
+    else:
+        print("Error: "+str(r.content))
+        return {}
+
+def endringssett(vegobjektid, miljø):
+    vegobjekt = hent_vegobjekt_info(vegobjektid, miljø)
+    versjon = vegobjekt.get('metadata').get('versjon')
+    typeid = vegobjekt.get('metadata').get('type').get('id')
+    print(versjon, typeid)
+    
+    return {
+        "lukk": {
+            "vegobjekter": [
+                {
+                    "lukkedato": str(datetime.datetime.now()).split(" ")[0],
+                    "kaskadelukking": 
+                    }
+                ]
+            }
+        }
+
+def main(vegobjektid, slette_objekt, miljø):
+    print(vegobjektid, slette_objekt, miljø)
+    username = input("Brukernavn: ")
+    password = getpass.getpass("Passord: ")
+    print(password)
+    
+    endringssett(vegobjektid, miljø)
+
+if __name__ == "__main__":
+    miljøer = ['prod', 'test', 'utv', 'stm']
+    parser = argparse.ArgumentParser(description='Fjern NVDB objekt.')
+    parser.add_argument('vegobjektid', type=int, help='Id til vegobjekt som skal slettes.')
+    parser.add_argument('slette_objekt', type=str2bool, help='Skal vegobjektet slettes (True) eller kun lukkes (False)?')
+    parser.add_argument('kaskadelukking', type=str2bool, help='Skal barnobjekter også slettes?')
+    parser.add_argument('miljø', help='Miljø vegobjektet skal slettes i: prod, test, utv eller stm', choices = miljøer)
+    args = parser.parse_args()
+    main(args.vegobjektid, args.slette_objekt, args.miljø)
