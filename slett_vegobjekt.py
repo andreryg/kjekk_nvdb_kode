@@ -9,6 +9,8 @@ import argparse
 import getpass
 import requests
 import datetime
+import json
+from pathlib import Path
 
 def fjern_vegobjekt(id):
     
@@ -39,37 +41,52 @@ def hent_vegobjekt_info(vegobjektid, miljø):
         print("Error: "+str(r.content))
         return {}
 
-def endringssett(vegobjektid, miljø):
+def lag_endringssett(vegobjektid, kaskadelukking, miljø):
     vegobjekt = hent_vegobjekt_info(vegobjektid, miljø)
     versjon = vegobjekt.get('metadata').get('versjon')
     typeid = vegobjekt.get('metadata').get('type').get('id')
     print(versjon, typeid)
+    
+    status = requests.get("https://nvdbapiles-v3.atlas.vegvesen.no/status", headers={'X-client':'Slett enkelt vegobjekt'})
+    if status.status_code == 200:
+        print(status.json())
+        datakatalogversjon = status.json().get('datagrunnlag').get('datakatalog').get('versjon')
+    else:
+        print("Error: "+str(status.content))
+        datakatalogversjon = "2.37"
     
     return {
         "lukk": {
             "vegobjekter": [
                 {
                     "lukkedato": str(datetime.datetime.now()).split(" ")[0],
-                    "kaskadelukking": 
+                    "kaskadelukking": "JA" if kaskadelukking else "NEI",
+                    "typeId": typeid,
+                    "nvdbId": vegobjektid,
+                    "versjon": versjon
                     }
                 ]
-            }
+            },
+        "datakatalogversjon": datakatalogversjon
         }
 
-def main(vegobjektid, slette_objekt, miljø):
+def main(vegobjektid, slette_objekt, kaskadelukking, miljø):
     print(vegobjektid, slette_objekt, miljø)
     username = input("Brukernavn: ")
     password = getpass.getpass("Passord: ")
     print(password)
     
-    endringssett(vegobjektid, miljø)
+    endringssett = lag_endringssett(vegobjektid, kaskadelukking, miljø)
+
+    with open(f"slett_{vegobjektid}.json", "w") as fp:
+        json.dump(endringssett, fp, indent=4, ensure_ascii=False)
 
 if __name__ == "__main__":
     miljøer = ['prod', 'test', 'utv', 'stm']
     parser = argparse.ArgumentParser(description='Fjern NVDB objekt.')
     parser.add_argument('vegobjektid', type=int, help='Id til vegobjekt som skal slettes.')
-    parser.add_argument('slette_objekt', type=str2bool, help='Skal vegobjektet slettes (True) eller kun lukkes (False)?')
+    parser.add_argument('lukke_objekt', type=str2bool, help='Skal vegobjektet lukkes (Ja) eller slettes (Nei)?')
     parser.add_argument('kaskadelukking', type=str2bool, help='Skal barnobjekter også slettes?')
     parser.add_argument('miljø', help='Miljø vegobjektet skal slettes i: prod, test, utv eller stm', choices = miljøer)
     args = parser.parse_args()
-    main(args.vegobjektid, args.slette_objekt, args.miljø)
+    main(args.vegobjektid, args.slette_objekt, args.kaskadelukking, args.miljø)
