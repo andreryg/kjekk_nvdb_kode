@@ -28,18 +28,31 @@ def str2bool(v):
         
 def hent_vegobjekt_info(vegobjektid, miljø):
     if miljø == 'utv':
-        r = requests.get(f"https://nvdbapiles-v3.utv.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Slett enkelt vegobjekt'})
+        r = requests.get(f"https://nvdbapiles-v3.utv.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Andryg - python Slett enkelt vegobjekt'})
     elif miljø == 'stm':
-        r = requests.get(f"https://nvdbapiles-v3-utv.stm.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Slett enkelt vegobjekt'})
+        r = requests.get(f"https://nvdbapiles-v3-stm.utv.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Andryg - python Slett enkelt vegobjekt'})
     elif miljø == 'test':
-        r = requests.get(f"https://nvdbapiles-v3.test.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Slett enkelt vegobjekt'})
+        r = requests.get(f"https://nvdbapiles-v3.test.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Andryg - python Slett enkelt vegobjekt'})
     else:
-        r = requests.get(f"https://nvdbapiles-v3.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Slett enkelt vegobjekt'})
+        r = requests.get(f"https://nvdbapiles-v3.atlas.vegvesen.no/vegobjekt", params={'id':vegobjektid}, headers={'X-client':'Andryg - python Slett enkelt vegobjekt'})
     if r.status_code == 200:
         return r.json()
     else:
         print("Error: "+str(r.content))
         return {}
+    
+def skriv(username, password, endringssett, miljø):
+    session = requests.session()
+    if miljø == 'utv':
+        url = "https://nvdbapiskriv.utv.atlas.vegvesen.no/rest/v1/oidc/authenticate"
+    elif miljø == 'stm':
+        url = "https://nvdbapiskriv-stm.utv.atlas.vegvesen.no/rest/v1/oidc/authenticate"
+    elif miljø == 'test':
+        url = "https://nvdbapiskriv.test.atlas.vegvesen.no/rest/v1/oidc/authenticate"
+    else:
+        url = "https://nvdbapiskriv.atlas.vegvesen.no/rest/v1/oidc/authenticate"
+        
+    
 
 def lag_endringssett(vegobjektid, kaskadelukking, miljø):
     vegobjekt = hent_vegobjekt_info(vegobjektid, miljø)
@@ -47,7 +60,7 @@ def lag_endringssett(vegobjektid, kaskadelukking, miljø):
     typeid = vegobjekt.get('metadata').get('type').get('id')
     print(versjon, typeid)
     
-    status = requests.get("https://nvdbapiles-v3.atlas.vegvesen.no/status", headers={'X-client':'Slett enkelt vegobjekt'})
+    status = requests.get("https://nvdbapiles-v3.atlas.vegvesen.no/status", headers={'X-client':'Andryg - python Slett enkelt vegobjekt'})
     if status.status_code == 200:
         print(status.json())
         datakatalogversjon = status.json().get('datagrunnlag').get('datakatalog').get('versjon')
@@ -70,8 +83,8 @@ def lag_endringssett(vegobjektid, kaskadelukking, miljø):
         "datakatalogversjon": datakatalogversjon
         }
 
-def main(vegobjektid, slette_objekt, kaskadelukking, miljø):
-    print(vegobjektid, slette_objekt, miljø)
+def main(vegobjektid, lukke_objekt, kaskadelukking, miljø):
+    print(vegobjektid, lukke_objekt, miljø)
     username = input("Brukernavn: ")
     password = getpass.getpass("Passord: ")
     print(password)
@@ -89,4 +102,4 @@ if __name__ == "__main__":
     parser.add_argument('kaskadelukking', type=str2bool, help='Skal barnobjekter også slettes?')
     parser.add_argument('miljø', help='Miljø vegobjektet skal slettes i: prod, test, utv eller stm', choices = miljøer)
     args = parser.parse_args()
-    main(args.vegobjektid, args.slette_objekt, args.kaskadelukking, args.miljø)
+    main(args.vegobjektid, args.lukke_objekt, args.kaskadelukking, args.miljø)
