@@ -7,21 +7,16 @@ Created on Wed Aug  7 08:09:48 2024
 
 import nvdbapiv3
 import pandas as pd
-import geopandas as gpd
-import numpy as np
-from shapely import wkt
-from datetime import datetime
 import intervals as I
+import argparse
 
 def download_vegnett():
     vegnett = pd.DataFrame(nvdbapiv3.nvdbVegnett(filter={'vegsystemreferanse':['E','R'],'veglenketype':'hoved','trafikantgruppe':'K'}).to_records())
     vegnett = vegnett[(vegnett['typeVeg'] == 'Enkel bilveg') | (vegnett['typeVeg'] == 'Kanalisert veg')]
     vegnett = vegnett[vegnett['fase'] == 'V']
-    vegnett['geometry'] = vegnett['geometri'].apply(wkt.loads)
-    vegnett = gpd.GeoDataFrame(vegnett, geometry='geometry', crs=5973)
     
     vegnett.to_excel("vegnett.xlsx")
-    return True
+    return vegnett
 
 def download_heldekkende_data(nvdbid):
     fagdata = nvdbapiv3.nvdbFagdata(nvdbid)
@@ -30,10 +25,8 @@ def download_heldekkende_data(nvdbid):
     fagdata = fagdata[fagdata['veglenkeType'] == 'HOVED']
     fagdata = fagdata[(fagdata['typeVeg'] == 'Enkel bilveg') | (fagdata['typeVeg'] == 'Kanalisert veg')]
     fagdata = fagdata[fagdata['fase'] == 'V']
-    fagdata['geometry'] = fagdata['geometri'].apply(wkt.loads)
-    fagdata = gpd.GeoDataFrame(fagdata, geometry='geometry', crs=5973)
     
-    fagdata.to_excel(f"{nvdbid}_{str(datetime.now()).split()[0]}.xlsx")
+    fagdata.to_excel(f"{nvdbid}.xlsx")
     return True
     
 def grupper_på_strekning(dataframe):
@@ -66,9 +59,19 @@ def finn_manglende_strekning(row):
     
     return rest_interval_y - rest_interval_x
 
-def main():
-    vegnett_df = pd.read_excel("vegnett.xlsx") #Fra download_vegnett
-    fagdata_df = pd.read_excel("639_2024-08-07.xlsx") #Fra download_heldekkende_data
+def main(vegobjektid):
+    try:
+        vegnett_df = pd.read_excel("vegnett.xlsx") #Fra download_vegnett
+    except FileNotFoundError:
+        print("Fil eksisterer ikke. Laster ned ny fil...")
+        vegnett_df = download_vegnett()
+        
+    try:
+        fagdata_df = pd.read_excel(f"{vegobjektid}.xlsx") #Fra download_heldekkende_data
+    except FileNotFoundError:
+        print("Fil eksisterer ikke. Laster ned ny fil...")
+        fagdata_df = download_heldekkende_data(vegobjektid)
+        
     fagdata_df = fagdata_df.rename(columns={'segmentlengde':'lengde'})
     
     vegnett_df = grupper_på_strekning(vegnett_df)
@@ -77,7 +80,10 @@ def main():
     merged_df = pd.merge(vegnett_df, fagdata_df[['strekning','meterverdi','lengde']], how='left', on='strekning')
     merged_df['manglende_lengde'] = merged_df.apply(lambda x: float(x.lengde_x)-float(x.lengde_y) if pd.notna(x.lengde_y) else x.lengde_x,axis=1)
     merged_df['manglende_strekninger'] = merged_df.apply(lambda x: finn_manglende_strekning(x),axis=1)
-    merged_df.to_excel("rapport.xlsx") #Legg til navn basert på nvdbid
+    merged_df.to_excel(f"rapport_{vegobjektid}.xlsx") #Legg til navn basert på nvdbid
     
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Finn strekninger med manglende data.')
+    parser.add_argument('vegobjektid', type=int, help='Id til heldekkende vegobjekt.')
+    args = parser.parse_args()
+    main(args.vegobjektid)
